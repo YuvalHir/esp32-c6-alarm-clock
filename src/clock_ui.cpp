@@ -398,13 +398,9 @@ void clock_ui_init() {
     lv_obj_center(obj_sun_orb);
     lv_obj_set_style_radius(obj_sun_orb, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(obj_sun_orb, lv_color_hex(0xF59E0B), 0);
-    lv_obj_set_style_bg_opa(obj_sun_orb, LV_OPA_80, 0);
+    lv_obj_set_style_bg_opa(obj_sun_orb, LV_OPA_90, 0);
     lv_obj_set_style_border_color(obj_sun_orb, lv_color_hex(0xFDE047), 0);
-    lv_obj_set_style_border_width(obj_sun_orb, 2, 0);
-    lv_obj_set_style_shadow_color(obj_sun_orb, lv_color_hex(0xFBBF24), 0);
-    lv_obj_set_style_shadow_width(obj_sun_orb, 50, 0);
-    lv_obj_set_style_shadow_spread(obj_sun_orb, 15, 0);
-    lv_obj_set_style_shadow_opa(obj_sun_orb, LV_OPA_70, 0);
+    lv_obj_set_style_border_width(obj_sun_orb, 3, 0);
     lv_obj_clear_flag(obj_sun_orb, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
 
     // 1b. Floating Cloud Accents (For Partly Cloudy / Overcast)
@@ -435,11 +431,7 @@ void clock_ui_init() {
     lv_obj_set_style_radius(obj_moon_sphere, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(obj_moon_sphere, lv_color_hex(0xFFFBEB), 0);
     lv_obj_set_style_border_color(obj_moon_sphere, lv_color_hex(0xFDE047), 0);
-    lv_obj_set_style_border_width(obj_moon_sphere, 1, 0);
-    lv_obj_set_style_shadow_color(obj_moon_sphere, lv_color_hex(0xFEF08A), 0);
-    lv_obj_set_style_shadow_width(obj_moon_sphere, 45, 0);
-    lv_obj_set_style_shadow_spread(obj_moon_sphere, 10, 0);
-    lv_obj_set_style_shadow_opa(obj_moon_sphere, LV_OPA_60, 0);
+    lv_obj_set_style_border_width(obj_moon_sphere, 2, 0);
     lv_obj_set_style_pad_all(obj_moon_sphere, 0, 0);
     lv_obj_clear_flag(obj_moon_sphere, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(obj_moon_sphere, LV_OBJ_FLAG_HIDDEN);
@@ -482,10 +474,6 @@ void clock_ui_init() {
     lbl_time = lv_label_create(cont_clock);
     lv_obj_set_style_text_font(lbl_time, &lv_font_montserrat_48, 0);
     lv_obj_set_style_text_color(lbl_time, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_shadow_color(lbl_time, lv_color_hex(0x000000), 0);
-    lv_obj_set_style_shadow_width(lbl_time, 16, 0);
-    lv_obj_set_style_shadow_spread(lbl_time, 4, 0);
-    lv_obj_set_style_shadow_opa(lbl_time, LV_OPA_90, 0);
     lv_label_set_text(lbl_time, "00:00");
     lv_obj_align(lbl_time, LV_ALIGN_CENTER, -25, -45);
 
@@ -1487,53 +1475,45 @@ void clock_ui_update_weather(float temp, int wmo_code, bool is_day, const char* 
                     lv_obj_center(obj_moon_shadow);
                     lv_obj_set_style_bg_color(obj_moon_sphere, lv_color_hex(0x0F172A), 0);
                     lv_obj_set_style_border_color(obj_moon_sphere, lv_color_hex(0x334155), 0);
-                    lv_obj_set_style_shadow_opa(obj_moon_sphere, LV_OPA_20, 0);
                     break;
                 case 1: // Waxing Crescent (Glow on right)
                     lv_obj_set_style_bg_color(obj_moon_sphere, lv_color_hex(0xFFFBEB), 0);
                     lv_obj_set_style_border_color(obj_moon_sphere, lv_color_hex(0xFDE047), 0);
-                    lv_obj_set_style_shadow_opa(obj_moon_sphere, LV_OPA_60, 0);
                     lv_obj_set_size(obj_moon_shadow, 145, 170);
                     lv_obj_align(obj_moon_shadow, LV_ALIGN_CENTER, -25, 0);
                     break;
                 case 2: // First Quarter (Right half bright)
                     lv_obj_set_style_bg_color(obj_moon_sphere, lv_color_hex(0xFFFBEB), 0);
                     lv_obj_set_style_border_color(obj_moon_sphere, lv_color_hex(0xFDE047), 0);
-                    lv_obj_set_style_shadow_opa(obj_moon_sphere, LV_OPA_60, 0);
                     lv_obj_set_size(obj_moon_shadow, 85, 170);
                     lv_obj_align(obj_moon_shadow, LV_ALIGN_LEFT_MID, 0, 0);
                     break;
                 case 3: // Waxing Gibbous (>75% bright)
                     lv_obj_set_style_bg_color(obj_moon_sphere, lv_color_hex(0xFFFBEB), 0);
                     lv_obj_set_style_border_color(obj_moon_sphere, lv_color_hex(0xFDE047), 0);
-                    lv_obj_set_style_shadow_opa(obj_moon_sphere, LV_OPA_70, 0);
                     lv_obj_set_size(obj_moon_shadow, 45, 170);
                     lv_obj_align(obj_moon_shadow, LV_ALIGN_LEFT_MID, 0, 0);
                     break;
                 case 4: // Full Moon (Radiant full lunar orb)
                     lv_obj_set_style_bg_color(obj_moon_sphere, lv_color_hex(0xFFFBEB), 0);
                     lv_obj_set_style_border_color(obj_moon_sphere, lv_color_hex(0xFDE047), 0);
-                    lv_obj_set_style_shadow_opa(obj_moon_sphere, LV_OPA_80, 0);
                     lv_obj_add_flag(obj_moon_shadow, LV_OBJ_FLAG_HIDDEN);
                     break;
                 case 5: // Waning Gibbous (>75% bright)
                     lv_obj_set_style_bg_color(obj_moon_sphere, lv_color_hex(0xFFFBEB), 0);
                     lv_obj_set_style_border_color(obj_moon_sphere, lv_color_hex(0xFDE047), 0);
-                    lv_obj_set_style_shadow_opa(obj_moon_sphere, LV_OPA_70, 0);
                     lv_obj_set_size(obj_moon_shadow, 45, 170);
                     lv_obj_align(obj_moon_shadow, LV_ALIGN_RIGHT_MID, 0, 0);
                     break;
                 case 6: // Last Quarter (Left half bright)
                     lv_obj_set_style_bg_color(obj_moon_sphere, lv_color_hex(0xFFFBEB), 0);
                     lv_obj_set_style_border_color(obj_moon_sphere, lv_color_hex(0xFDE047), 0);
-                    lv_obj_set_style_shadow_opa(obj_moon_sphere, LV_OPA_60, 0);
                     lv_obj_set_size(obj_moon_shadow, 85, 170);
                     lv_obj_align(obj_moon_shadow, LV_ALIGN_RIGHT_MID, 0, 0);
                     break;
                 case 7: // Waning Crescent (Glow on left)
                     lv_obj_set_style_bg_color(obj_moon_sphere, lv_color_hex(0xFFFBEB), 0);
                     lv_obj_set_style_border_color(obj_moon_sphere, lv_color_hex(0xFDE047), 0);
-                    lv_obj_set_style_shadow_opa(obj_moon_sphere, LV_OPA_60, 0);
                     lv_obj_set_size(obj_moon_shadow, 145, 170);
                     lv_obj_align(obj_moon_shadow, LV_ALIGN_CENTER, 25, 0);
                     break;
@@ -1559,10 +1539,7 @@ void clock_ui_update_weather(float temp, int wmo_code, bool is_day, const char* 
             // Sunny / Clear: Radiant Golden Sun
             lv_obj_set_style_bg_color(obj_sun_orb, lv_color_hex(0xF59E0B), 0);
             lv_obj_set_style_border_color(obj_sun_orb, lv_color_hex(0xFDE047), 0);
-            lv_obj_set_style_shadow_color(obj_sun_orb, lv_color_hex(0xFBBF24), 0);
-            lv_obj_set_style_shadow_width(obj_sun_orb, 50, 0);
-            lv_obj_set_style_shadow_spread(obj_sun_orb, 15, 0);
-            lv_obj_set_style_shadow_opa(obj_sun_orb, LV_OPA_80, 0);
+            lv_obj_set_style_border_width(obj_sun_orb, 3, 0);
             lv_obj_set_style_text_color(lbl_weather_text, lv_color_hex(0xFBBF24), 0);
             if (obj_cloud_left) lv_obj_add_flag(obj_cloud_left, LV_OBJ_FLAG_HIDDEN);
             if (obj_cloud_right) lv_obj_add_flag(obj_cloud_right, LV_OBJ_FLAG_HIDDEN);
@@ -1570,10 +1547,7 @@ void clock_ui_update_weather(float temp, int wmo_code, bool is_day, const char* 
             // Partly Cloudy / Overcast: Sun with floating clouds
             lv_obj_set_style_bg_color(obj_sun_orb, lv_color_hex(0x475569), 0);
             lv_obj_set_style_border_color(obj_sun_orb, lv_color_hex(0x94A3B8), 0);
-            lv_obj_set_style_shadow_color(obj_sun_orb, lv_color_hex(0x334155), 0);
-            lv_obj_set_style_shadow_width(obj_sun_orb, 30, 0);
-            lv_obj_set_style_shadow_spread(obj_sun_orb, 8, 0);
-            lv_obj_set_style_shadow_opa(obj_sun_orb, LV_OPA_50, 0);
+            lv_obj_set_style_border_width(obj_sun_orb, 2, 0);
             lv_obj_set_style_text_color(lbl_weather_text, lv_color_hex(0xE2E8F0), 0);
             if (obj_cloud_left) lv_obj_clear_flag(obj_cloud_left, LV_OBJ_FLAG_HIDDEN);
             if (obj_cloud_right) lv_obj_clear_flag(obj_cloud_right, LV_OBJ_FLAG_HIDDEN);
@@ -1581,10 +1555,7 @@ void clock_ui_update_weather(float temp, int wmo_code, bool is_day, const char* 
             // Drizzle / Rain: Deep Cyan Storm Orb
             lv_obj_set_style_bg_color(obj_sun_orb, lv_color_hex(0x0284C7), 0);
             lv_obj_set_style_border_color(obj_sun_orb, lv_color_hex(0x38BDF8), 0);
-            lv_obj_set_style_shadow_color(obj_sun_orb, lv_color_hex(0x0369A1), 0);
-            lv_obj_set_style_shadow_width(obj_sun_orb, 45, 0);
-            lv_obj_set_style_shadow_spread(obj_sun_orb, 12, 0);
-            lv_obj_set_style_shadow_opa(obj_sun_orb, LV_OPA_70, 0);
+            lv_obj_set_style_border_width(obj_sun_orb, 2, 0);
             lv_obj_set_style_text_color(lbl_weather_text, lv_color_hex(0x38BDF8), 0);
             if (obj_cloud_left) lv_obj_clear_flag(obj_cloud_left, LV_OBJ_FLAG_HIDDEN);
             if (obj_cloud_right) lv_obj_clear_flag(obj_cloud_right, LV_OBJ_FLAG_HIDDEN);
@@ -1592,10 +1563,7 @@ void clock_ui_update_weather(float temp, int wmo_code, bool is_day, const char* 
             // Snow / Frost
             lv_obj_set_style_bg_color(obj_sun_orb, lv_color_hex(0xBAE6FD), 0);
             lv_obj_set_style_border_color(obj_sun_orb, lv_color_hex(0xFFFFFF), 0);
-            lv_obj_set_style_shadow_color(obj_sun_orb, lv_color_hex(0xE0F2FE), 0);
-            lv_obj_set_style_shadow_width(obj_sun_orb, 40, 0);
-            lv_obj_set_style_shadow_spread(obj_sun_orb, 10, 0);
-            lv_obj_set_style_shadow_opa(obj_sun_orb, LV_OPA_70, 0);
+            lv_obj_set_style_border_width(obj_sun_orb, 2, 0);
             lv_obj_set_style_text_color(lbl_weather_text, lv_color_hex(0xE0F2FE), 0);
             if (obj_cloud_left) lv_obj_add_flag(obj_cloud_left, LV_OBJ_FLAG_HIDDEN);
             if (obj_cloud_right) lv_obj_add_flag(obj_cloud_right, LV_OBJ_FLAG_HIDDEN);
@@ -1603,20 +1571,14 @@ void clock_ui_update_weather(float temp, int wmo_code, bool is_day, const char* 
             // Thunderstorm: Violet Tempest Orb
             lv_obj_set_style_bg_color(obj_sun_orb, lv_color_hex(0x581C87), 0);
             lv_obj_set_style_border_color(obj_sun_orb, lv_color_hex(0xFDE047), 0);
-            lv_obj_set_style_shadow_color(obj_sun_orb, lv_color_hex(0x7C3AED), 0);
-            lv_obj_set_style_shadow_width(obj_sun_orb, 55, 0);
-            lv_obj_set_style_shadow_spread(obj_sun_orb, 15, 0);
-            lv_obj_set_style_shadow_opa(obj_sun_orb, LV_OPA_80, 0);
+            lv_obj_set_style_border_width(obj_sun_orb, 3, 0);
             lv_obj_set_style_text_color(lbl_weather_text, lv_color_hex(0xFBBF24), 0);
             if (obj_cloud_left) lv_obj_clear_flag(obj_cloud_left, LV_OBJ_FLAG_HIDDEN);
             if (obj_cloud_right) lv_obj_clear_flag(obj_cloud_right, LV_OBJ_FLAG_HIDDEN);
         } else {
             lv_obj_set_style_bg_color(obj_sun_orb, lv_color_hex(0x64748B), 0);
             lv_obj_set_style_border_color(obj_sun_orb, lv_color_hex(0x94A3B8), 0);
-            lv_obj_set_style_shadow_color(obj_sun_orb, lv_color_hex(0x334155), 0);
-            lv_obj_set_style_shadow_width(obj_sun_orb, 30, 0);
-            lv_obj_set_style_shadow_spread(obj_sun_orb, 8, 0);
-            lv_obj_set_style_shadow_opa(obj_sun_orb, LV_OPA_50, 0);
+            lv_obj_set_style_border_width(obj_sun_orb, 2, 0);
             lv_obj_set_style_text_color(lbl_weather_text, lv_color_hex(0xE2E8F0), 0);
             if (obj_cloud_left) lv_obj_add_flag(obj_cloud_left, LV_OBJ_FLAG_HIDDEN);
             if (obj_cloud_right) lv_obj_add_flag(obj_cloud_right, LV_OBJ_FLAG_HIDDEN);
