@@ -98,7 +98,7 @@ public:
         Serial.println("[Location] Auto-detecting location & timezone via IP geolocation...");
         HTTPClient http;
         http.setTimeout(4000);
-        http.begin("http://ip-api.com/json/?fields=status,country,city,timezone");
+        http.begin("http://ip-api.com/json/?fields=status,country,city,lat,lon,timezone");
 
         int code = http.GET();
         if (code != HTTP_CODE_OK) {
@@ -119,6 +119,15 @@ public:
             parse_json_value(payload, "country", country, sizeof(country));
             parse_json_value(payload, "city", city, sizeof(city));
             parse_json_value(payload, "timezone", tz, sizeof(tz));
+
+            int lat_idx = payload.indexOf("\"lat\":");
+            if (lat_idx != -1) {
+                ClockConfigManager::settings.latitude = payload.substring(lat_idx + 6).toFloat();
+            }
+            int lon_idx = payload.indexOf("\"lon\":");
+            if (lon_idx != -1) {
+                ClockConfigManager::settings.longitude = payload.substring(lon_idx + 6).toFloat();
+            }
 
             char loc_buf[48];
             if (strlen(city) > 0 && strlen(country) > 0) {

@@ -22,6 +22,13 @@ static lv_obj_t *btn_alarm_pill = NULL;
 static lv_obj_t *lbl_alarm_pill = NULL;
 static lv_obj_t *btn_open_settings = NULL;
 
+// Weather & Moon Phase Widget Objects
+static lv_obj_t *btn_weather_pill = NULL;
+static lv_obj_t *obj_weather_icon = NULL;
+static lv_obj_t *obj_moon_mask = NULL;
+static lv_obj_t *lbl_weather_text = NULL;
+static bool weather_refresh_requested = false;
+
 // Dedicated Brightness Modal Objects
 static lv_obj_t *modal_brightness = NULL;
 static lv_obj_t *lbl_bright_percent = NULL;
@@ -81,6 +88,14 @@ static lv_color_t color_interpolate(lv_color_t c1, lv_color_t c2, float t) {
 
 static void event_scr_activity(lv_event_t *e) {
     clock_ui_handle_activity();
+}
+
+static void event_btn_weather_clicked(lv_event_t *e) {
+    clock_ui_handle_activity();
+    weather_refresh_requested = true;
+    if (lbl_weather_text) {
+        lv_label_set_text(lbl_weather_text, "Updating...");
+    }
 }
 
 static void event_btn_alarm_pill(lv_event_t *e) {
@@ -344,7 +359,7 @@ void clock_ui_init() {
     lv_obj_set_style_text_font(lbl_time, &lv_font_montserrat_48, 0);
     lv_obj_set_style_text_color(lbl_time, lv_color_hex(0xFFFFFF), 0);
     lv_label_set_text(lbl_time, "00:00");
-    lv_obj_align(lbl_time, LV_ALIGN_CENTER, -25, -45);
+    lv_obj_align(lbl_time, LV_ALIGN_CENTER, -25, -55);
 
     // AM/PM & Seconds indicator
     lbl_ampm = lv_label_create(cont_clock);
@@ -364,13 +379,53 @@ void clock_ui_init() {
     lv_obj_set_style_text_font(lbl_date, &lv_font_montserrat_18, 0);
     lv_obj_set_style_text_color(lbl_date, lv_color_hex(0x94A3B8), 0);
     lv_label_set_text(lbl_date, "Saturday, Oct 24");
-    lv_obj_align(lbl_date, LV_ALIGN_CENTER, 0, 18);
+    lv_obj_align(lbl_date, LV_ALIGN_CENTER, 0, 4);
+
+    // Weather & Moon Phase Pill Button (Shows Weather Graphics by Day & Moon Phase by Night)
+    btn_weather_pill = lv_btn_create(cont_clock);
+    lv_obj_set_size(btn_weather_pill, 270, 38);
+    lv_obj_align(btn_weather_pill, LV_ALIGN_CENTER, 0, 48);
+    lv_obj_set_style_radius(btn_weather_pill, 19, 0);
+    lv_obj_set_style_bg_color(btn_weather_pill, lv_color_hex(0x1E293B), 0);
+    lv_obj_set_style_bg_opa(btn_weather_pill, LV_OPA_80, 0);
+    lv_obj_set_style_border_color(btn_weather_pill, lv_color_hex(0x475569), 0);
+    lv_obj_set_style_border_width(btn_weather_pill, 1, 0);
+    lv_obj_set_style_pad_all(btn_weather_pill, 4, 0);
+    lv_obj_add_event_cb(btn_weather_pill, event_btn_weather_clicked, LV_EVENT_CLICKED, NULL);
+
+    // Weather / Moon Graphic Icon Container
+    obj_weather_icon = lv_obj_create(btn_weather_pill);
+    lv_obj_set_size(obj_weather_icon, 24, 24);
+    lv_obj_align(obj_weather_icon, LV_ALIGN_LEFT_MID, 6, 0);
+    lv_obj_set_style_radius(obj_weather_icon, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(obj_weather_icon, lv_color_hex(0xF59E0B), 0);
+    lv_obj_set_style_border_color(obj_weather_icon, lv_color_hex(0xFDE047), 0);
+    lv_obj_set_style_border_width(obj_weather_icon, 2, 0);
+    lv_obj_set_style_pad_all(obj_weather_icon, 0, 0);
+    lv_obj_clear_flag(obj_weather_icon, LV_OBJ_FLAG_CLICKABLE);
+
+    // Inner moon phase shadow mask (for rendering crescent/gibbous/quarters)
+    obj_moon_mask = lv_obj_create(obj_weather_icon);
+    lv_obj_set_size(obj_moon_mask, 16, 20);
+    lv_obj_align(obj_moon_mask, LV_ALIGN_CENTER, -4, 0);
+    lv_obj_set_style_radius(obj_moon_mask, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(obj_moon_mask, lv_color_hex(0x0F172A), 0);
+    lv_obj_set_style_border_width(obj_moon_mask, 0, 0);
+    lv_obj_add_flag(obj_moon_mask, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(obj_moon_mask, LV_OBJ_FLAG_CLICKABLE);
+
+    // Weather & Moon Condition & Temperature Text
+    lbl_weather_text = lv_label_create(btn_weather_pill);
+    lv_obj_set_style_text_font(lbl_weather_text, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_color(lbl_weather_text, lv_color_hex(0xFBBF24), 0);
+    lv_label_set_text(lbl_weather_text, "Sunny  25°C");
+    lv_obj_align(lbl_weather_text, LV_ALIGN_LEFT_MID, 38, 0);
 
     // Alarm Pill Touch Button (High contrast, finger-friendly)
     btn_alarm_pill = lv_btn_create(cont_clock);
-    lv_obj_set_size(btn_alarm_pill, 340, 48);
-    lv_obj_align(btn_alarm_pill, LV_ALIGN_CENTER, 0, 80);
-    lv_obj_set_style_radius(btn_alarm_pill, 24, 0);
+    lv_obj_set_size(btn_alarm_pill, 310, 44);
+    lv_obj_align(btn_alarm_pill, LV_ALIGN_CENTER, 0, 102);
+    lv_obj_set_style_radius(btn_alarm_pill, 22, 0);
     lv_obj_set_style_bg_color(btn_alarm_pill, lv_color_hex(0x0F172A), 0);
     lv_obj_set_style_border_color(btn_alarm_pill, lv_color_hex(0xF59E0B), 0);
     lv_obj_set_style_border_width(btn_alarm_pill, 2, 0);
@@ -385,11 +440,11 @@ void clock_ui_init() {
     lv_label_set_text(lbl_alarm_pill, LV_SYMBOL_BELL " ALARM: 07:00 AM");
     lv_obj_center(lbl_alarm_pill);
 
-    // Centered Settings Button (Clear, prominent, 210x50 touch target)
+    // Centered Settings Button (Clear, prominent, 200x44 touch target)
     btn_open_settings = lv_btn_create(cont_clock);
-    lv_obj_set_size(btn_open_settings, 210, 50);
-    lv_obj_align(btn_open_settings, LV_ALIGN_CENTER, 0, 155);
-    lv_obj_set_style_radius(btn_open_settings, 25, 0);
+    lv_obj_set_size(btn_open_settings, 200, 44);
+    lv_obj_align(btn_open_settings, LV_ALIGN_CENTER, 0, 162);
+    lv_obj_set_style_radius(btn_open_settings, 22, 0);
     lv_obj_set_style_bg_color(btn_open_settings, lv_color_hex(0x1E293B), 0);
     lv_obj_set_style_border_color(btn_open_settings, lv_color_hex(0x475569), 0);
     lv_obj_set_style_border_width(btn_open_settings, 2, 0);
@@ -834,47 +889,63 @@ void clock_ui_set_callbacks(AlarmActionCallback alarm_cb, SettingsSavedCallback 
 }
 
 void clock_ui_update_time(int hour, int min, int sec, const char* date_str, bool is_24h) {
+    static int last_hour = -1;
+    static int last_min = -1;
+    static int last_sec = -1;
+    static bool last_24h = false;
+    static char last_date_buf[48] = "";
+
+    bool time_changed = (hour != last_hour || min != last_min || is_24h != last_24h);
+    bool sec_changed = (sec != last_sec);
+    bool date_changed = (date_str && strcmp(date_str, last_date_buf) != 0);
+
+    // If nothing changed, return immediately without locking LVGL or invalidating widgets!
+    if (!time_changed && !sec_changed && !date_changed) {
+        return;
+    }
+
     if (!lbl_time || !bsp_lvgl_lock(20)) return;
 
-    char buf[16];
-    if (is_24h) {
-        snprintf(buf, sizeof(buf), "%02d:%02d", hour, min);
-        lv_label_set_text(lbl_time, buf);
-        lv_obj_add_flag(lbl_ampm, LV_OBJ_FLAG_HIDDEN);
-    } else {
-        int display_hour = hour % 12;
-        if (display_hour == 0) display_hour = 12;
-        snprintf(buf, sizeof(buf), "%02d:%02d", display_hour, min);
-        lv_label_set_text(lbl_time, buf);
-        lv_label_set_text(lbl_ampm, hour >= 12 ? "PM" : "AM");
-        lv_obj_clear_flag(lbl_ampm, LV_OBJ_FLAG_HIDDEN);
-    }
+    if (time_changed) {
+        last_hour = hour;
+        last_min = min;
+        last_24h = is_24h;
 
-    snprintf(buf, sizeof(buf), ":%02d", sec);
-    lv_label_set_text(lbl_seconds, buf);
-
-    if (lbl_sunrise_time) {
-        char sbuf[16];
+        char buf[16];
         if (is_24h) {
-            snprintf(sbuf, sizeof(sbuf), "%02d:%02d", hour, min);
+            snprintf(buf, sizeof(buf), "%02d:%02d", hour, min);
+            lv_label_set_text(lbl_time, buf);
+            lv_obj_add_flag(lbl_ampm, LV_OBJ_FLAG_HIDDEN);
         } else {
-            int dh = hour % 12; if (dh == 0) dh = 12;
-            snprintf(sbuf, sizeof(sbuf), "%02d:%02d %s", dh, min, hour >= 12 ? "PM" : "AM");
+            int display_hour = hour % 12;
+            if (display_hour == 0) display_hour = 12;
+            snprintf(buf, sizeof(buf), "%02d:%02d", display_hour, min);
+            lv_label_set_text(lbl_time, buf);
+            lv_label_set_text(lbl_ampm, hour >= 12 ? "PM" : "AM");
+            lv_obj_clear_flag(lbl_ampm, LV_OBJ_FLAG_HIDDEN);
         }
-        lv_label_set_text(lbl_sunrise_time, sbuf);
-    }
-    if (lbl_alarm_time) {
-        char abuf[16];
-        if (is_24h) {
-            snprintf(abuf, sizeof(abuf), "%02d:%02d", hour, min);
-        } else {
-            int dh = hour % 12; if (dh == 0) dh = 12;
-            snprintf(abuf, sizeof(abuf), "%02d:%02d %s", dh, min, hour >= 12 ? "PM" : "AM");
+
+        if (lbl_sunrise_time && current_mode == UI_MODE_SUNRISE) {
+            char sbuf[16];
+            snprintf(sbuf, sizeof(sbuf), "%s", buf);
+            lv_label_set_text(lbl_sunrise_time, sbuf);
         }
-        lv_label_set_text(lbl_alarm_time, abuf);
+        if (lbl_alarm_time && current_mode == UI_MODE_ALARM_RINGING) {
+            char abuf[16];
+            snprintf(abuf, sizeof(abuf), "%s", buf);
+            lv_label_set_text(lbl_alarm_time, abuf);
+        }
     }
 
-    if (date_str) {
+    if (sec_changed) {
+        last_sec = sec;
+        char buf[8];
+        snprintf(buf, sizeof(buf), ":%02d", sec);
+        lv_label_set_text(lbl_seconds, buf);
+    }
+
+    if (date_changed) {
+        strncpy(last_date_buf, date_str, sizeof(last_date_buf) - 1);
         lv_label_set_text(lbl_date, date_str);
     }
 
@@ -882,34 +953,55 @@ void clock_ui_update_time(int hour, int min, int sec, const char* date_str, bool
 }
 
 void clock_ui_update_status(bool wifi_connected, const char* wifi_info, int batt_percent, int batt_mv, bool is_charging) {
-    if (!lbl_wifi || !bsp_lvgl_lock(20)) return;
+    static int last_batt_pct = -99;
+    static bool last_chg = false;
+    static bool last_wifi = false;
+    static char last_wifi_buf[48] = "";
 
-    if (wifi_connected) {
-        lv_label_set_text_fmt(lbl_wifi, LV_SYMBOL_WIFI " %s", wifi_info ? wifi_info : "Online");
-        lv_obj_set_style_text_color(lbl_wifi, lv_color_hex(0x38BDF8), 0);
-    } else {
-        lv_label_set_text(lbl_wifi, LV_SYMBOL_WIFI " AP: Clock");
-        lv_obj_set_style_text_color(lbl_wifi, lv_color_hex(0x94A3B8), 0);
+    const char* winfo = wifi_info ? wifi_info : "";
+    bool wifi_changed = (wifi_connected != last_wifi || strcmp(winfo, last_wifi_buf) != 0);
+    bool batt_changed = (batt_percent != last_batt_pct || is_charging != last_chg);
+
+    if (!wifi_changed && !batt_changed) {
+        return; // Nothing changed, skip redraw!
     }
 
-    if (batt_percent < 0 || (batt_percent == 0 && batt_mv <= 0)) {
-        // Powered directly via USB without battery
-        lv_label_set_text(lbl_batt, LV_SYMBOL_CHARGE " USB");
-        lv_obj_set_style_text_color(lbl_batt, lv_color_hex(0x10B981), 0);
-    } else if (is_charging) {
-        lv_label_set_text_fmt(lbl_batt, LV_SYMBOL_CHARGE " %d%%", batt_percent);
-        lv_obj_set_style_text_color(lbl_batt, lv_color_hex(0x10B981), 0);
-    } else {
-        // Discharging on battery - display percentage with dynamic icons
-        if (batt_percent >= 60) {
-            lv_label_set_text_fmt(lbl_batt, LV_SYMBOL_BATTERY_FULL " %d%%", batt_percent);
-            lv_obj_set_style_text_color(lbl_batt, lv_color_hex(0x10B981), 0);
-        } else if (batt_percent >= 25) {
-            lv_label_set_text_fmt(lbl_batt, LV_SYMBOL_BATTERY_2 " %d%%", batt_percent);
-            lv_obj_set_style_text_color(lbl_batt, lv_color_hex(0xF59E0B), 0);
+    if (!lbl_wifi || !bsp_lvgl_lock(20)) return;
+
+    if (wifi_changed) {
+        last_wifi = wifi_connected;
+        strncpy(last_wifi_buf, winfo, sizeof(last_wifi_buf) - 1);
+        if (wifi_connected) {
+            lv_label_set_text_fmt(lbl_wifi, LV_SYMBOL_WIFI " %s", winfo[0] ? winfo : "Online");
+            lv_obj_set_style_text_color(lbl_wifi, lv_color_hex(0x38BDF8), 0);
         } else {
-            lv_label_set_text_fmt(lbl_batt, LV_SYMBOL_BATTERY_EMPTY " %d%%", batt_percent);
-            lv_obj_set_style_text_color(lbl_batt, lv_color_hex(0xEF4444), 0);
+            lv_label_set_text(lbl_wifi, LV_SYMBOL_WIFI " AP: Clock");
+            lv_obj_set_style_text_color(lbl_wifi, lv_color_hex(0x94A3B8), 0);
+        }
+    }
+
+    if (batt_changed) {
+        last_batt_pct = batt_percent;
+        last_chg = is_charging;
+        if (batt_percent < 0 || (batt_percent == 0 && batt_mv <= 0)) {
+            // Powered directly via USB without battery
+            lv_label_set_text(lbl_batt, LV_SYMBOL_CHARGE " USB");
+            lv_obj_set_style_text_color(lbl_batt, lv_color_hex(0x10B981), 0);
+        } else if (is_charging) {
+            lv_label_set_text_fmt(lbl_batt, LV_SYMBOL_CHARGE " %d%%", batt_percent);
+            lv_obj_set_style_text_color(lbl_batt, lv_color_hex(0x10B981), 0);
+        } else {
+            // Discharging on battery - display percentage with dynamic icons
+            if (batt_percent >= 60) {
+                lv_label_set_text_fmt(lbl_batt, LV_SYMBOL_BATTERY_FULL " %d%%", batt_percent);
+                lv_obj_set_style_text_color(lbl_batt, lv_color_hex(0x10B981), 0);
+            } else if (batt_percent >= 25) {
+                lv_label_set_text_fmt(lbl_batt, LV_SYMBOL_BATTERY_2 " %d%%", batt_percent);
+                lv_obj_set_style_text_color(lbl_batt, lv_color_hex(0xF59E0B), 0);
+            } else {
+                lv_label_set_text_fmt(lbl_batt, LV_SYMBOL_BATTERY_EMPTY " %d%%", batt_percent);
+                lv_obj_set_style_text_color(lbl_batt, lv_color_hex(0xEF4444), 0);
+            }
         }
     }
 
@@ -1193,6 +1285,11 @@ bool clock_ui_is_dimmed() {
 }
 
 void clock_ui_check_inactivity() {
+    static unsigned long last_check_ms = 0;
+    unsigned long now = millis();
+    if (now - last_check_ms < 100) return; // Run 10 times/sec, saving CPU cycles
+    last_check_ms = now;
+
     // Only auto-dim in UI_MODE_CLOCK or UI_MODE_SETTINGS
     if (current_mode != UI_MODE_CLOCK && current_mode != UI_MODE_SETTINGS) {
         return;
@@ -1219,4 +1316,155 @@ void clock_ui_check_inactivity() {
         is_dimmed = false;
         Lcd_SetBacklight(ClockConfigManager::settings.day_brightness);
     }
+}
+
+bool clock_ui_check_weather_refresh_requested() {
+    if (weather_refresh_requested) {
+        weather_refresh_requested = false;
+        return true;
+    }
+    return false;
+}
+
+void clock_ui_update_weather(float temp, int wmo_code, bool is_day, const char* condition, const char* moon_phase, uint8_t moon_code) {
+    if (!lbl_weather_text) return;
+
+    // Check if it's nighttime
+    bool show_moon = (!is_day || is_night_mode);
+    int temp_int = (int)round(temp);
+
+    static int last_temp = -999;
+    static int last_wmo = -999;
+    static bool last_show_moon = false;
+    static uint8_t last_moon_code = 255;
+
+    // Fast diff check: skip LVGL lock and redraw if weather/moon status hasn't changed
+    if (temp_int == last_temp && wmo_code == last_wmo && show_moon == last_show_moon && moon_code == last_moon_code) {
+        return;
+    }
+
+    if (!bsp_lvgl_lock(20)) return;
+
+    last_temp = temp_int;
+    last_wmo = wmo_code;
+    last_show_moon = show_moon;
+    last_moon_code = moon_code;
+
+    char buf[48];
+    if (show_moon) {
+        // Night Mode: Display Moon Phase & Night Temperature!
+        snprintf(buf, sizeof(buf), "%s  %d°C", moon_phase ? moon_phase : "Moon", (int)round(temp));
+        lv_label_set_text(lbl_weather_text, buf);
+        lv_obj_set_style_text_color(lbl_weather_text, lv_color_hex(0xFEF08A), 0); // Lunar golden-cream
+        lv_obj_set_style_border_color(btn_weather_pill, lv_color_hex(0xFDE047), 0);
+
+        // Render Moon Phase Graphic
+        lv_obj_set_style_bg_color(obj_weather_icon, lv_color_hex(0x1E293B), 0);
+        lv_obj_set_style_border_color(obj_weather_icon, lv_color_hex(0xE2E8F0), 0);
+
+        switch (moon_code) {
+            case 0: // New Moon
+                lv_obj_set_style_bg_color(obj_weather_icon, lv_color_hex(0x0F172A), 0);
+                lv_obj_set_style_border_color(obj_weather_icon, lv_color_hex(0x475569), 0);
+                lv_obj_add_flag(obj_moon_mask, LV_OBJ_FLAG_HIDDEN);
+                break;
+            case 1: // Waxing Crescent
+                lv_obj_set_style_bg_color(obj_weather_icon, lv_color_hex(0x0F172A), 0);
+                lv_obj_set_style_border_color(obj_weather_icon, lv_color_hex(0xFEF08A), 0);
+                lv_obj_clear_flag(obj_moon_mask, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_set_size(obj_moon_mask, 16, 20);
+                lv_obj_align(obj_moon_mask, LV_ALIGN_CENTER, -4, 0);
+                lv_obj_set_style_bg_color(obj_moon_mask, lv_color_hex(0x0F172A), 0);
+                break;
+            case 2: // First Quarter
+                lv_obj_set_style_bg_color(obj_weather_icon, lv_color_hex(0xFEF08A), 0);
+                lv_obj_clear_flag(obj_moon_mask, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_set_size(obj_moon_mask, 11, 20);
+                lv_obj_align(obj_moon_mask, LV_ALIGN_LEFT_MID, 0, 0);
+                lv_obj_set_style_bg_color(obj_moon_mask, lv_color_hex(0x0F172A), 0);
+                break;
+            case 3: // Waxing Gibbous
+                lv_obj_set_style_bg_color(obj_weather_icon, lv_color_hex(0xFEF08A), 0);
+                lv_obj_clear_flag(obj_moon_mask, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_set_size(obj_moon_mask, 6, 20);
+                lv_obj_align(obj_moon_mask, LV_ALIGN_LEFT_MID, 0, 0);
+                lv_obj_set_style_bg_color(obj_moon_mask, lv_color_hex(0x0F172A), 0);
+                break;
+            case 4: // Full Moon
+                lv_obj_set_style_bg_color(obj_weather_icon, lv_color_hex(0xFFFBEB), 0); // Radiant full moon
+                lv_obj_set_style_border_color(obj_weather_icon, lv_color_hex(0xFDE047), 0);
+                lv_obj_add_flag(obj_moon_mask, LV_OBJ_FLAG_HIDDEN);
+                break;
+            case 5: // Waning Gibbous
+                lv_obj_set_style_bg_color(obj_weather_icon, lv_color_hex(0xFEF08A), 0);
+                lv_obj_clear_flag(obj_moon_mask, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_set_size(obj_moon_mask, 6, 20);
+                lv_obj_align(obj_moon_mask, LV_ALIGN_RIGHT_MID, 0, 0);
+                lv_obj_set_style_bg_color(obj_moon_mask, lv_color_hex(0x0F172A), 0);
+                break;
+            case 6: // Last Quarter
+                lv_obj_set_style_bg_color(obj_weather_icon, lv_color_hex(0xFEF08A), 0);
+                lv_obj_clear_flag(obj_moon_mask, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_set_size(obj_moon_mask, 11, 20);
+                lv_obj_align(obj_moon_mask, LV_ALIGN_RIGHT_MID, 0, 0);
+                lv_obj_set_style_bg_color(obj_moon_mask, lv_color_hex(0x0F172A), 0);
+                break;
+            case 7: // Waning Crescent
+                lv_obj_set_style_bg_color(obj_weather_icon, lv_color_hex(0x0F172A), 0);
+                lv_obj_set_style_border_color(obj_weather_icon, lv_color_hex(0xFEF08A), 0);
+                lv_obj_clear_flag(obj_moon_mask, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_set_size(obj_moon_mask, 16, 20);
+                lv_obj_align(obj_moon_mask, LV_ALIGN_CENTER, 4, 0);
+                lv_obj_set_style_bg_color(obj_moon_mask, lv_color_hex(0x0F172A), 0);
+                break;
+            default:
+                lv_obj_add_flag(obj_moon_mask, LV_OBJ_FLAG_HIDDEN);
+                break;
+        }
+    } else {
+        // Day Mode: Display Weather Condition & Temperature!
+        snprintf(buf, sizeof(buf), "%s  %d°C", condition ? condition : "Clear", (int)round(temp));
+        lv_label_set_text(lbl_weather_text, buf);
+        lv_obj_add_flag(obj_moon_mask, LV_OBJ_FLAG_HIDDEN);
+
+        // Graphic weather icon styling based on WMO code
+        if (wmo_code == 0 || wmo_code == 1) {
+            // Sunny / Clear
+            lv_obj_set_style_bg_color(obj_weather_icon, lv_color_hex(0xF59E0B), 0);
+            lv_obj_set_style_border_color(obj_weather_icon, lv_color_hex(0xFDE047), 0);
+            lv_obj_set_style_text_color(lbl_weather_text, lv_color_hex(0xFBBF24), 0);
+            lv_obj_set_style_border_color(btn_weather_pill, lv_color_hex(0xF59E0B), 0);
+        } else if (wmo_code == 2 || wmo_code == 3) {
+            // Partly cloudy / Overcast
+            lv_obj_set_style_bg_color(obj_weather_icon, lv_color_hex(0x64748B), 0);
+            lv_obj_set_style_border_color(obj_weather_icon, lv_color_hex(0x94A3B8), 0);
+            lv_obj_set_style_text_color(lbl_weather_text, lv_color_hex(0xE2E8F0), 0);
+            lv_obj_set_style_border_color(btn_weather_pill, lv_color_hex(0x475569), 0);
+        } else if (wmo_code >= 51 && wmo_code <= 67) {
+            // Drizzle / Rain
+            lv_obj_set_style_bg_color(obj_weather_icon, lv_color_hex(0x0284C7), 0);
+            lv_obj_set_style_border_color(obj_weather_icon, lv_color_hex(0x38BDF8), 0);
+            lv_obj_set_style_text_color(lbl_weather_text, lv_color_hex(0x38BDF8), 0);
+            lv_obj_set_style_border_color(btn_weather_pill, lv_color_hex(0x0284C7), 0);
+        } else if (wmo_code >= 71 && wmo_code <= 86) {
+            // Snow / Showers
+            lv_obj_set_style_bg_color(obj_weather_icon, lv_color_hex(0xBAE6FD), 0);
+            lv_obj_set_style_border_color(obj_weather_icon, lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_text_color(lbl_weather_text, lv_color_hex(0xE0F2FE), 0);
+            lv_obj_set_style_border_color(btn_weather_pill, lv_color_hex(0x38BDF8), 0);
+        } else if (wmo_code >= 95) {
+            // Thunderstorm
+            lv_obj_set_style_bg_color(obj_weather_icon, lv_color_hex(0x7C3AED), 0);
+            lv_obj_set_style_border_color(obj_weather_icon, lv_color_hex(0xFDE047), 0);
+            lv_obj_set_style_text_color(lbl_weather_text, lv_color_hex(0xFBBF24), 0);
+            lv_obj_set_style_border_color(btn_weather_pill, lv_color_hex(0x7C3AED), 0);
+        } else {
+            lv_obj_set_style_bg_color(obj_weather_icon, lv_color_hex(0x64748B), 0);
+            lv_obj_set_style_border_color(obj_weather_icon, lv_color_hex(0x94A3B8), 0);
+            lv_obj_set_style_text_color(lbl_weather_text, lv_color_hex(0xE2E8F0), 0);
+            lv_obj_set_style_border_color(btn_weather_pill, lv_color_hex(0x334155), 0);
+        }
+    }
+
+    bsp_lvgl_unlock();
 }

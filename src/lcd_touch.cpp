@@ -49,7 +49,7 @@ uint8_t LcdTouchPanel::GetCoords(uint16_t *x, uint16_t *y) {
   static uint16_t last_x = 0, last_y = 0;
 
   unsigned long now = millis();
-  if (now - last_poll_ms < 15) {
+  if (now - last_poll_ms < 5) {
     if (last_state) {
       *x = last_x;
       *y = last_y;

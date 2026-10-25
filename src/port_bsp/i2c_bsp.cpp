@@ -7,8 +7,8 @@ static uint32_t i2c_data_pdMS_TICKS = 0;
 static uint32_t i2c_done_pdMS_TICKS = 0;
 
 I2cMasterBus::I2cMasterBus(int scl_pin, int sda_pin, int i2c_port) {
-  i2c_data_pdMS_TICKS = pdMS_TO_TICKS(5000);
-  i2c_done_pdMS_TICKS = pdMS_TO_TICKS(1000);
+  i2c_data_pdMS_TICKS = pdMS_TO_TICKS(50);
+  i2c_done_pdMS_TICKS = pdMS_TO_TICKS(20);
 
   i2c_master_bus_config_t i2c_bus_config = {};
   i2c_bus_config.clk_source = I2C_CLK_SRC_DEFAULT;

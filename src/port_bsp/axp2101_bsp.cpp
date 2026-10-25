@@ -20,7 +20,7 @@ static int AXP2101_SLAVE_Read(uint8_t devAddr, uint8_t regAddr, uint8_t *data, u
     ret = (i2cbus_->i2c_read_buff(i2cPMICdev, regAddr, data, len) == ESP_OK) ? 0 : -1;
     if (ret == 0)
       break;
-    vTaskDelay(pdMS_TO_TICKS(100));
+    delayMicroseconds(200);
     count--;
   } while (count);
   return ret;
@@ -33,7 +33,7 @@ static int AXP2101_SLAVE_Write(uint8_t devAddr, uint8_t regAddr, uint8_t *data, 
     ret = (i2cbus_->i2c_write_buff(i2cPMICdev, regAddr, data, len) == ESP_OK) ? 0 : -1;
     if (ret == 0)
       break;
-    vTaskDelay(pdMS_TO_TICKS(100));
+    delayMicroseconds(200);
     count--;
   } while (count);
   return ret;

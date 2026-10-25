@@ -22,6 +22,8 @@ void clock_ui_set_callbacks(AlarmActionCallback alarm_cb, SettingsSavedCallback 
 void clock_ui_update_time(int hour, int min, int sec, const char* date_str, bool is_24h);
 void clock_ui_update_status(bool wifi_connected, const char* wifi_info, int batt_percent, int batt_mv, bool is_charging);
 void clock_ui_update_alarm_pill(bool enabled, uint8_t hour, uint8_t min, uint8_t sunrise_min, bool is_24h);
+void clock_ui_update_weather(float temp, int wmo_code, bool is_day, const char* condition, const char* moon_phase, uint8_t moon_code);
+bool clock_ui_check_weather_refresh_requested();
 
 void clock_ui_start_sunrise(int total_duration_sec);
 void clock_ui_update_sunrise(float progress, int remaining_sec);

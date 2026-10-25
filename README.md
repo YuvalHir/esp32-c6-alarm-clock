@@ -22,6 +22,17 @@ Featuring an organic gradual sunrise visual simulation, onboard high-fidelity au
   - Applies official POSIX timezone rules (e.g. `IST-2IDT,M3.4.4/26,M10.5.0` for Israel).
   - Handles Daylight Saving Time switches (UTC+3 $\leftrightarrow$ UTC+2) seamlessly without manual adjustments.
   - Hardware RTC (PCF85063A) synchronization keeps precise time across power cycles.
+- **Live Weather Graphics & Astronomical Moon Phase**:
+  - Zero-API-key real-time weather integration via Open-Meteo REST API.
+  - Dynamic weather pill with custom vector icon graphics and color palettes (Sunny, Partly Cloudy, Overcast, Rain, Snow, Thunderstorm).
+  - High-precision astronomical Meeus lunar engine calculating current moon age and rendering 8 distinct lunar phases at night (New Moon, Waxing Crescent, First Quarter, Waxing Gibbous, Full Moon, Waning Gibbous, Last Quarter, Waning Crescent).
+  - Tap-to-refresh weather touch target on the main clock face.
+- **Ultra-Fast & Responsive Architecture (Zero-Lag UI)**:
+  - **Eliminated I2C Bus Starvation**: CST9220 touch sensor and AXP2101 PMIC share `I2C0`. Throttled PMIC power key reads from 1,000+ Hz to 150 ms intervals, freeing 99.9% of bus bandwidth for instant touch response.
+  - **200 Hz Touch Scanning**: Reduced capacitive touch polling interval from 15 ms to 5 ms.
+  - **Diff-Cached LVGL Rendering**: 48pt digits and UI widgets only invalidate when text/values actually change, eliminating ~80% of unnecessary CPU redraws.
+  - **Enlarged QSPI DMA Buffers**: Expanded draw buffers from 30 lines to 48 lines, reducing frame flush chunks from 16 to 10 per render.
+  - **Reduced I2C Timeouts**: Lowered bus lock timeouts from 5,000 ms to 50 ms.
 - **Ultra-Low Power Battery Optimization**:
   - **Wi-Fi 802.11 Modem Sleep**: Radio sleeps between router beacon intervals, keeping HTTP access available while dropping radio current by ~85%.
   - **SoftAP Disabled on Connect**: Eliminates continuous 20 dBm AP beacon broadcasts.
@@ -102,6 +113,7 @@ esp32-c6-alarm-clock/
 │   ├── main.cpp                # State machine, hardware buttons, boot sequence
 │   ├── clock_ui.cpp            # LVGL 8.4 circular clock face, settings, sunrise UI
 │   ├── clock_ui.h
+│   ├── clock_weather.h         # Open-Meteo REST service & astronomical lunar phase engine
 │   ├── clock_web.h             # Embedded responsive Web configuration portal
 │   ├── clock_location.h        # IP Geolocation & POSIX DST dynamic timezone manager
 │   ├── alarm_audio.cpp         # ES8311 DAC driver & algorithmic tone generator
@@ -163,6 +175,9 @@ http://<device-ip>/   (e.g., http://192.168.3.201/)
   - Toggle auto-detection on Wi-Fi connect.
   - Select manual region from 30+ major world regions.
   - Force re-detection via IP geolocation.
+- **🌤️ Real-Time Weather & Lunar Phase**:
+  - Live temperature (&deg;C), sky conditions, day/night indicator, and moon phase.
+  - Instant on-demand weather sync button.
 - **⏰ Alarm Configuration**:
   - Set alarm hour (0–23) and minute (0–59).
   - Set sunrise duration (5, 10, 15, or 30 minutes).

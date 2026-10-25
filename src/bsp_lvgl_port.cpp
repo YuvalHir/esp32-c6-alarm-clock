@@ -172,7 +172,7 @@ void bsp_lvgl_init(I2cMasterBus &i2cbus) {
   lv_init();
   Serial.printf("[Display] Free heap: %u bytes\n", (unsigned int)esp_get_free_heap_size());
   
-  const size_t buf_lines = 30;
+  const size_t buf_lines = 48; // Increased from 30 to 48 lines for 37% fewer DMA flushes
   const size_t buf_size = BSP_LCD_H_RES * buf_lines;
   lv_color_t *buf1 = (lv_color_t *)heap_caps_malloc(buf_size * sizeof(lv_color_t), MALLOC_CAP_DMA);
   lv_color_t *buf2 = (lv_color_t *)heap_caps_malloc(buf_size * sizeof(lv_color_t), MALLOC_CAP_DMA);

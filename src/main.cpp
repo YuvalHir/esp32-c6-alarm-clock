@@ -13,6 +13,7 @@
 #include "clock_location.h"
 #include "clock_ui.h"
 #include "clock_web.h"
+#include "clock_weather.h"
 #include "alarm_audio.h"
 
 I2cMasterBus I2cMasterBus_(GPIO_NUM_7, GPIO_NUM_8, I2C_NUM_0);
@@ -124,7 +125,14 @@ static void check_physical_buttons() {
 
     int key_state = digitalRead(PIN_BTN_KEY);
     int boot_state = digitalRead(PIN_BTN_BOOT);
-    bool pwr_pressed = Axp2101_WasPowerButtonPressed();
+
+    // Only poll AXP2101 PMIC over I2C every 150ms to keep I2C bus 100% free for touch responsiveness!
+    bool pwr_pressed = false;
+    static unsigned long last_pwr_poll = 0;
+    if (now - last_pwr_poll >= 150) {
+        last_pwr_poll = now;
+        pwr_pressed = Axp2101_WasPowerButtonPressed();
+    }
 
     bool button_triggered = false;
     const char *btn_name = "";
@@ -182,6 +190,7 @@ void setup() {
 
     // 1. Load saved preferences from NVS & apply POSIX Timezone FIRST
     ClockConfigManager::init();
+    ClockWeatherManager::init();
     sntp_set_time_sync_notification_cb(timeavailable);
     ClockLocationManager::apply_tz(ClockConfigManager::settings.posix_tz);
 
@@ -307,6 +316,8 @@ void loop() {
             if (ClockConfigManager::settings.auto_location) {
                 ClockLocationManager::detect_location();
             }
+            // Fetch live weather from Open-Meteo
+            ClockWeatherManager::fetch_weather(ClockConfigManager::settings.latitude, ClockConfigManager::settings.longitude);
         } else if (!wifi_conn && last_wifi_state) {
             last_wifi_state = false;
         }
@@ -317,8 +328,14 @@ void loop() {
         bool charging = Axp2101_IsCharging();
 
         clock_ui_update_status(wifi_conn, wifi_str.c_str(), batt_percent, batt_mv, charging);
+    }
 
-        // (Serial logging moved into state machine with full time & location)
+    // Weather periodic refresh (every 30 minutes) or on tap-to-refresh
+    static unsigned long last_weather_fetch_ms = 0;
+    bool tap_weather_refresh = clock_ui_check_weather_refresh_requested();
+    if (WiFi.status() == WL_CONNECTED && (tap_weather_refresh || (last_weather_fetch_ms > 0 && now_ms - last_weather_fetch_ms >= 1800000))) {
+        last_weather_fetch_ms = now_ms;
+        ClockWeatherManager::fetch_weather(ClockConfigManager::settings.latitude, ClockConfigManager::settings.longitude);
     }
 
     // Main Clock / Sunrise / Alarm State Machine (Runs every 200ms)
@@ -352,6 +369,17 @@ void loop() {
                 timeinfo.tm_sec, 
                 date_buf, 
                 ClockConfigManager::settings.is_24h_format
+            );
+
+            // Calculate Astronomical Moon Phase & Update Weather / Moon Pill
+            ClockWeatherManager::calculate_moon(timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday);
+            clock_ui_update_weather(
+                ClockWeatherManager::data.temperature,
+                ClockWeatherManager::data.weather_code,
+                ClockWeatherManager::data.is_day,
+                ClockWeatherManager::data.condition_text,
+                ClockWeatherManager::data.moon_phase_text,
+                ClockWeatherManager::data.moon_phase_code
             );
 
             static unsigned long last_serial_ms = 0;
@@ -463,5 +491,5 @@ void loop() {
         }
     }
 
-    delay(5);
+    delay(2);
 }

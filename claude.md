@@ -101,7 +101,32 @@ This guide documents the architecture, hardware specifics, coding conventions, p
 
 ---
 
-## 6. Build & Flashing Instructions (PlatformIO)
+## 6. Zero-Lag Performance & I2C Bus Management Rules
+
+- **Shared I2C Bus Bottleneck (`I2C_NUM_0`)**:
+  - The CST9220 touch sensor and AXP2101 PMIC share GPIO 7 (SCL) and GPIO 8 (SDA).
+  - Calling `Axp2101_WasPowerButtonPressed()` executes 3 synchronous I2C read transactions (`0x48`, `0x49`, `0x4A`).
+  - **CRITICAL RULE**: NEVER poll AXP2101 PMIC registers unconditionally on every `loop()` cycle. Throttle PMIC polling to $\ge 150\text{ ms}$ intervals. Discrete GPIO buttons (`KEY` on GPIO 10, `BOOT` on GPIO 9) remain 0-latency hardware reads.
+  - CST9220 touch polling interval in `src/lcd_touch.cpp` is tuned to $5\text{ ms}$ (up to 200 Hz scan rate).
+- **LVGL Diff-Caching**:
+  - Never call `lv_label_set_text` or re-style widgets repeatedly unless values have actually changed. Doing so marks LVGL widgets dirty and triggers expensive full font re-rasterization.
+  - Clock time (`clock_ui_update_time`), battery status (`clock_ui_update_status`), and weather/moon status (`clock_ui_update_weather`) implement strict diff-caching guards that return in nanoseconds without locking LVGL when values are static.
+
+---
+
+## 7. Weather & Astronomical Lunar Phase Engine
+
+- **Open-Meteo REST Service (`src/clock_weather.h`)**:
+  - Zero API key required, non-commercial open weather forecasts.
+  - Query: `http://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f&current=temperature_2m,weather_code,is_day`.
+  - Target object: Always parse the `"current": { ... }` object to avoid matching text labels inside `"current_units"`.
+- **Astronomical Lunar Engine**:
+  - Meeus/Conway algorithm calculates exact lunar age ($0.0 \dots 29.53$ days) and Julian day fraction.
+  - Automatically renders 8 distinct moon phases at night on the circular watchface using a dual-circle shadow mask.
+
+---
+
+## 8. Build & Flashing Instructions (PlatformIO)
 
 ### Environment
 - **Platform**: `https://github.com/pioarduino/platform-espressif32.git`
@@ -133,6 +158,7 @@ pio run -t upload
 - `POST /save_alarm` — Form args: `hour` (0–23), `min` (0–59), `sun_min` (5, 10, 15, 30), `enabled` (0/1).
 - `POST /save_location` — Form args: `auto_loc` (0/1), `tz_iana` (IANA identifier e.g. `Asia/Jerusalem`).
 - `POST /detect_location` — Triggers instant background IP geolocation re-detection.
+- `POST /refresh_weather` — Manually triggers instant Open-Meteo weather and moon phase refresh.
 - `POST /save_brightness` — Form args: `brightness` (10–100), `night_dim` (0–25, where 0 = Completely OFF).
 - `POST /test_sunrise` — Starts 20-second sunrise visual animation.
 - `POST /test_sound` — Plays 4-tone speaker chime test.

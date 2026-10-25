@@ -27,6 +27,8 @@ struct AlarmSettings {
     uint8_t day_brightness;    // 10 - 100%
     uint8_t night_brightness;  // 5 - 30%
     uint8_t night_dim_level;   // 5% default for maximum night battery savings
+    float latitude;            // GPS / Geolocation Latitude (default 32.0167 for Israel)
+    float longitude;           // GPS / Geolocation Longitude (default 34.7833 for Israel)
 };
 
 class ClockConfigManager {
@@ -49,6 +51,8 @@ public:
         settings.day_brightness = 90;
         settings.night_brightness = 15;
         settings.night_dim_level = 0; // 0% = Screen Completely OFF at night for maximum battery savings!
+        settings.latitude = 32.0167f;
+        settings.longitude = 34.7833f;
         strncpy(settings.wifi_ssid, DEFAULT_WIFI_SSID, sizeof(settings.wifi_ssid) - 1);
         strncpy(settings.wifi_pass, DEFAULT_WIFI_PASS, sizeof(settings.wifi_pass) - 1);
 
@@ -81,6 +85,9 @@ public:
             settings.gmt_offset_sec = prefs.getInt("gmt_sec", settings.gmt_offset_sec);
             settings.daylight_offset_sec = prefs.getInt("dst_sec", settings.daylight_offset_sec);
             
+            settings.latitude = prefs.getFloat("lat", settings.latitude);
+            settings.longitude = prefs.getFloat("lon", settings.longitude);
+
             uint8_t db = prefs.getUChar("day_br", 90);
             if (db > 0) settings.day_brightness = db;
             uint8_t nb = prefs.getUChar("nit_br", 15);
@@ -115,6 +122,8 @@ public:
             prefs.putInt("dst_sec", settings.daylight_offset_sec);
             prefs.putUChar("day_br", settings.day_brightness);
             prefs.putUChar("nit_br", settings.night_brightness);
+            prefs.putFloat("lat", settings.latitude);
+            prefs.putFloat("lon", settings.longitude);
             prefs.putString("ssid", settings.wifi_ssid);
             prefs.putString("pass", settings.wifi_pass);
             prefs.end();

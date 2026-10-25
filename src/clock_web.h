@@ -4,6 +4,7 @@
 #include "clock_config.h"
 #include "clock_ui.h"
 #include "clock_location.h"
+#include "clock_weather.h"
 #include "bsp_lvgl_port.h"
 
 class ClockWebServer {
@@ -64,6 +65,20 @@ private:
 
         html += "<form method='POST' action='/detect_location' style='margin-top:6px;'>";
         html += "<button type='submit' class='btn-sec'>🔄 Re-Detect Location via IP Now</button>";
+        html += "</form>";
+        html += "</div>";
+
+        // Card 1.5: Real-time Weather & Moon Phase
+        html += "<div class='card'>";
+        html += "<h3>🌤️ Real-Time Weather & Lunar Phase</h3>";
+        html += "<div class='info-box'>";
+        html += "<div><b>Condition:</b> " + String(ClockWeatherManager::data.condition_text) + " (" + String(ClockWeatherManager::data.temperature, 1) + "&deg;C)</div>";
+        html += "<div><b>Day / Night:</b> " + String(ClockWeatherManager::data.is_day ? "Daytime ☀️" : "Nighttime 🌙") + "</div>";
+        html += "<div><b>Moon Phase:</b> " + String(ClockWeatherManager::data.moon_phase_text) + " (Age: " + String(ClockWeatherManager::data.moon_age, 1) + " days)</div>";
+        html += "<div><b>Coordinates:</b> " + String(ClockConfigManager::settings.latitude, 4) + ", " + String(ClockConfigManager::settings.longitude, 4) + "</div>";
+        html += "</div>";
+        html += "<form method='POST' action='/refresh_weather'>";
+        html += "<button type='submit' class='btn-sec'>🔄 Refresh Weather & Moon Data Now</button>";
         html += "</form>";
         html += "</div>";
 
@@ -220,12 +235,19 @@ private:
         server.send(303);
     }
 
+    static void handleRefreshWeather() {
+        ClockWeatherManager::fetch_weather(ClockConfigManager::settings.latitude, ClockConfigManager::settings.longitude);
+        server.sendHeader("Location", "/");
+        server.send(303);
+    }
+
 public:
     static void init() {
         server.on("/", handleRoot);
         server.on("/save_alarm", HTTP_POST, handleSaveAlarm);
         server.on("/save_location", HTTP_POST, handleSaveLocation);
         server.on("/detect_location", HTTP_POST, handleDetectLocation);
+        server.on("/refresh_weather", HTTP_POST, handleRefreshWeather);
         server.on("/save_brightness", HTTP_POST, handleSaveBrightness);
         server.on("/save_wifi", HTTP_POST, handleSaveWifi);
         server.on("/test_sunrise", HTTP_POST, handleTestSunrise);
