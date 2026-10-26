@@ -37,7 +37,7 @@
 #define BSP_SD_CS               (GPIO_NUM_6)
 
 #define LVGL_TICK_PERIOD_MS    2
-#define LVGL_TASK_MAX_DELAY_MS 500
+#define LVGL_TASK_MAX_DELAY_MS 15
 #define LVGL_TASK_MIN_DELAY_MS 5
 #define LVGL_TASK_STACK_SIZE   (8 * 1024)
 #define LVGL_TASK_PRIORITY     2

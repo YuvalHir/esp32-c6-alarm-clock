@@ -48,23 +48,41 @@ This guide documents the architecture, hardware specifics, coding conventions, p
 
 ## 3. Power-Saving Architecture (Target: 30–40+ Hours on 800 mAh)
 
-1. **Wi-Fi 802.11 Modem Sleep**:
-   - MUST keep `WiFi.setSleep(true)` and `esp_wifi_set_ps(WIFI_PS_MIN_MODEM)`.
-   - Never disable Wi-Fi sleep in `main.cpp`. The router buffers packets and notifies the ESP32 in DTIM beacons, allowing HTTP requests to serve instantly while saving ~100 mA.
-   - Once connected to STA mode, disable SoftAP (`WiFi.mode(WIFI_STA)`), which saves ~90 mA of 20 dBm beacon transmission power.
+1. **USB-Plugged Always-On Portal & Dynamic Wi-Fi Management**:
+   - **On USB Power (VBUS in / Charging)**:
+     - Wi-Fi radio powers **ON** automatically.
+     - Runs in full-performance mode (`WiFi.setSleep(false)`, `WIFI_PS_NONE`) for instant, zero-latency Web Portal responses (`http://192.168.3.201/`).
+     - WebServer is active and accepts configuration changes, alarm saves, and test previews.
+   - **On Battery (Unplugged)**:
+     - Wi-Fi radio is immediately and completely powered **OFF** (`esp_wifi_stop()`, `WiFi.mode(WIFI_OFF)`), saving **50–80 mA** continuous current (>60% of device idle draw).
+     - WebServer is suspended to conserve CPU cycles.
+     - Status bar indicates `LV_SYMBOL_POWER " Batt Mode"` in muted slate grey.
+     - Timekeeping is maintained with ±2ppm precision (<0.1s drift per day) by the onboard **PCF85063A hardware RTC** independently of network.
+   - **Dynamic Transition**:
+     - System polls `Axp2101_IsVbusIn()` every 2 seconds in `main.cpp`, transitioning seamlessly between USB Always-On Portal mode and 0 mA Battery Sleep mode upon cable insertion or removal.
 
-2. **ES8311 Codec Deep Standby (0 mA)**:
-   - In `alarm_audio.cpp`: When audio stops, call `es8311_power_down()`.
-   - Sequence: Mute DAC (`0x31 = 0x60`), Power down DAC circuit (`0x12 = 0x3F`), Power down analog blocks (`0x0E = 0xFF`), and call `i2s_channel_disable(tx_handle)`.
-   - Wake sequence: `es8311_power_up()` re-enables analog blocks, un-powers down DAC, unmutes, and calls `i2s_channel_enable(tx_handle)`.
+2. **Display Refresh Throttling (Option A)**:
+   - When running on battery and screen is dimmed, seconds are frozen to `":.."` and display redraws drop from 60 frames/min to **1 frame/min** (on the minute rollover), reducing QSPI bus activity by **98.3%**.
+   - Touching the screen or pressing any hardware button immediately restores live ticking seconds (`:01`, `:02`...) for the duration of the awake timeout.
+   - Micro-animation timers (`timer_weather_anim` at 20 Hz) are automatically paused via `lv_timer_pause()` when entering dim mode and resumed via `lv_timer_resume()` on activity.
 
-3. **Night Screen-OFF Mode**:
-   - OLED displays emit light per-pixel. Black (`#000000`) draws 0 mA.
+3. **ES8311 Codec Deep Standby (0 mA)**:
+   - When audio is idle: Call `es8311_power_down()`.
+     - DAC Mute (`0x31 = 0x60`), Power down DAC circuit (`0x12 = 0x3F`), Power down analog blocks (`0x0E = 0xFF`).
+     - Disable I2S channel (`i2s_channel_disable(tx_handle)`), stopping MCLK, BCLK, and WS clocks entirely (saves ~15 mA).
+   - When audio starts: Call `es8311_power_up()`.
+     - Enable I2S channel (`i2s_channel_enable(tx_handle)`).
+     - Wait 15ms (`vTaskDelay(pdMS_TO_TICKS(15))`) for MCLK to stabilize for the ES8311 internal PLL.
+     - Re-enable analog circuits (`0x0E = 0x00`), DAC (`0x12 = 0x00`), CSM state machine (`0x0D = 0x01`), set volume (`0x32 = current_vol_reg`), and unmute (`0x31 = 0x00`).
+   - Thread safety: `alarm_audio_stop()` resets playing flags and allows `audio_task` to handle clean powering down without cross-thread I2S handle contention.
+
+4. **Night Screen-OFF Mode & AMOLED True-Black**:
+   - OLED displays emit light per-pixel. True black (`#000000`) draws 0 mA pixel emission.
+   - Backgrounds for night stage, dimmed face, and modal dialogs are `#000000`.
    - `Lcd_SetBacklight(0)` sets DCS register `0x51` to `0x00`, cutting pixel luminance entirely.
-   - During night hours (22:00 – 06:30), 7 seconds of inactivity turns the display completely OFF.
-   - Touching the screen or pressing KEY, BOOT, or PWR triggers `clock_ui_handle_activity()`, waking the display for 7 seconds.
+   - Touching the screen or pressing KEY, BOOT, or PWR wakes the display.
 
-4. **AXP2101 Power Rails**:
+5. **AXP2101 Power Rails**:
    - `ALDO1`: 3.3V to ES8311 Audio Codec.
    - `ALDO2`: 3.3V auxiliary.
    - `ALDO3`: 3.3V AMOLED display logic reset.
@@ -79,10 +97,13 @@ This guide documents the architecture, hardware specifics, coding conventions, p
 - **Safe Zone Rule**: Any interactive button centered at $(X, Y)$ with width $W$ and height $H$ MUST satisfy:
   $$\sqrt{(|X| + W/2)^2 + (|Y| + H/2)^2} < 235\text{ px}$$
   Elements placed beyond $R \approx 235$ px will clip against the physical round metal bezel.
-- **Center Positioning**: Always position controls relative to `LV_ALIGN_CENTER` with explicit offsets rather than corner alignments (`LV_ALIGN_BOTTOM_LEFT`, etc.).
+- **Status Bar Margins**:
+  - `lbl_wifi`: `LV_ALIGN_TOP_LEFT, 34, 14` (clears curved top-left bezel).
+  - `lbl_batt`: `LV_ALIGN_TOP_RIGHT, -34, 14` (clears curved top-right bezel).
+- **Center Positioning**: Always position controls relative to `LV_ALIGN_CENTER` with explicit offsets rather than corner alignments.
 - **Font Declarations**:
   - `lv_conf.h` has `LV_FONT_MONTSERRAT_18`, `20`, `24`, `32`, `48` enabled.
-  - `LV_FONT_MONTSERRAT_16` is DISABLED (0). Use `&lv_font_montserrat_18` instead.
+  - `LV_FONT_MONTSERRAT_16` is DISABLED (0). Use `&lv_font_montserrat_18` or `&lv_font_montserrat_20` instead.
 
 ---
 
@@ -126,33 +147,39 @@ This guide documents the architecture, hardware specifics, coding conventions, p
 
 ---
 
-## 8. Build & Flashing Instructions (PlatformIO)
+## 8. Build & Flashing Instructions (PlatformIO & esptool)
 
 ### Environment
 - **Platform**: `https://github.com/pioarduino/platform-espressif32.git`
 - **Board**: `esp32-c6-devkitm-1`
 - **Framework**: `arduino`
 
-### Windows Console UTF-8 Notice
-On Windows, PlatformIO's Python CLI output uses Unicode progress characters. In PowerShell, ensure UTF-8 encoding before building/flashing:
+### Compilation
 ```powershell
-$env:PYTHONIOENCODING="utf-8"
-chcp 65001
-pio run -t upload
+pio run -e esp32-c6-touch-amoled-216
+```
+
+### Direct Flashing (Avoids Windows cp1252 Unicode upload crash)
+On Windows, PlatformIO's Python click console wrapper can fail when rendering Unicode block progress characters under cp1252. Flash directly and reliably using `esptool`:
+```powershell
+python -m esptool --chip esp32c6 --port COM3 --baud 921600 write-flash --flash-size 16MB 0x0 .pio/build/esp32-c6-touch-amoled-216/firmware.factory.bin
 ```
 
 ### Serial Monitoring
 - Baud rate: `115200`.
 - The ESP32-C6 uses built-in USB-JTAG. Do NOT pulse DTR/RTS when opening the serial port in Python or monitoring tools unless an explicit reset is desired:
   ```python
-  ser = serial.Serial('COM3', 115200)
-  ser.setDTR(False)
-  ser.setRTS(False)
+  ser = serial.Serial()
+  ser.port = 'COM3'
+  ser.baudrate = 115200
+  ser.dtr = False
+  ser.rts = False
+  ser.open()
   ```
 
 ---
 
-## 7. Web Management Server API Endpoints
+## 9. Web Management Server API Endpoints
 
 - `GET /` — Responsive mobile-friendly HTML5 control dashboard.
 - `POST /save_alarm` — Form args: `hour` (0–23), `min` (0–59), `sun_min` (5, 10, 15, 30), `enabled` (0/1).
@@ -163,3 +190,4 @@ pio run -t upload
 - `POST /test_sunrise` — Starts 20-second sunrise visual animation.
 - `POST /test_sound` — Plays 4-tone speaker chime test.
 - `POST /save_wifi` — Form args: `ssid`, `pass`.
+

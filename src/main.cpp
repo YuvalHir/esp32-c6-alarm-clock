@@ -54,10 +54,8 @@ void handleAlarmAction(bool is_snooze) {
         Serial.printf("[Alarm] Snoozed until %02d:%02d\n", snooze_hour, snooze_min);
     } else {
         snooze_active = false;
-        if (!is_test_sunrise) {
-            alarm_fired_today = true;
-        }
-        Serial.println("[Alarm] Dismissed");
+        alarm_fired_today = true;
+        Serial.println("[Alarm Action] Dismissed -> Audio stopped, UI returned to Clock");
     }
 
     clock_state = STATE_CLOCK;
@@ -75,7 +73,16 @@ void handleSettingsSaved() {
         ClockConfigManager::settings.sunrise_minutes,
         ClockConfigManager::settings.is_24h_format
     );
-    alarm_fired_today = false; // Reset so new time can fire
+    // Only reset fired flag if alarm time actually changed after initialization
+    static int last_saved_h = -1;
+    static int last_saved_m = -1;
+    if (last_saved_h != ClockConfigManager::settings.alarm_hour || last_saved_m != ClockConfigManager::settings.alarm_minute) {
+        if (last_saved_h != -1) {
+            alarm_fired_today = false;
+        }
+        last_saved_h = ClockConfigManager::settings.alarm_hour;
+        last_saved_m = ClockConfigManager::settings.alarm_minute;
+    }
     Serial.println("[Settings] Alarm and Location configuration updated and saved");
 }
 
@@ -162,10 +169,8 @@ static void check_physical_buttons() {
             Serial.println("[Button] Alarm Ringing -> Dismissing Alarm");
             handleAlarmAction(false); // Dismiss
         } else if (clock_state == STATE_SUNRISE) {
-            Serial.println("[Button] Sunrise Simulation Active -> Cancelling");
-            clock_state = STATE_CLOCK;
-            is_test_sunrise = false;
-            clock_ui_dismiss_alarm();
+            Serial.println("[Button] Sunrise Simulation Active -> Dismissing");
+            handleAlarmAction(false); // Cleanly dismiss, stop audio if any, and set alarm_fired_today
         } else {
             // Normal Clock Mode: Wake screen immediately or keep awake
             if (clock_ui_is_dimmed()) {
@@ -174,6 +179,41 @@ static void check_physical_buttons() {
             clock_ui_handle_activity();
         }
     }
+}
+
+// Power-Aware Wi-Fi Management:
+// Wi-Fi radio and Web Portal operate ONLY when USB cable is connected!
+static bool wifi_is_powered = false;
+
+static void wifi_power_on() {
+    if (wifi_is_powered) return;
+    wifi_is_powered = true;
+    Serial.println("[Power] USB Cable Plugged In -> Enabling Wi-Fi Radio & Web Portal");
+    WiFi.setAutoReconnect(true);
+    WiFi.setSleep(false); // USB powered: full performance and instant web responses
+    esp_wifi_set_ps(WIFI_PS_NONE);
+
+    if (strlen(ClockConfigManager::settings.wifi_ssid) > 0) {
+        WiFi.mode(WIFI_STA);
+        Serial.printf("[Wi-Fi] Connecting in STA mode to '%s' (SoftAP off for power saving)...\n", ClockConfigManager::settings.wifi_ssid);
+        WiFi.begin(ClockConfigManager::settings.wifi_ssid, ClockConfigManager::settings.wifi_pass);
+    } else {
+        WiFi.mode(WIFI_AP_STA);
+        WiFi.softAP("ESP32-Sunrise-Clock", "12345678");
+        Serial.print("[Wi-Fi] SoftAP Started. Connect to 'ESP32-Sunrise-Clock' at IP: ");
+        Serial.println(WiFi.softAPIP());
+    }
+    ClockWebServer::init();
+}
+
+static void wifi_power_off() {
+    if (!wifi_is_powered) return;
+    wifi_is_powered = false;
+    Serial.println("[Power] Running on Battery -> Disabling Wi-Fi Radio (0mA draw)");
+    ClockWebServer::stop();
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    esp_wifi_stop();
 }
 
 void setup() {
@@ -232,6 +272,7 @@ void setup() {
     Lcd_SetBacklight(ClockConfigManager::settings.day_brightness);
 
     // 5. Build the UI
+    ClockWeatherManager::init();
     Serial.println("[UI] Building Clock UI...");
     clock_ui_init();
     clock_ui_set_callbacks(handleAlarmAction, handleSettingsSaved, handleTestSunrise);
@@ -244,27 +285,21 @@ void setup() {
     );
     int init_batt_mv = Axp2101_GetBattVoltage();
     int init_batt_pct = Axp2101_GetBatteryPercent();
-    clock_ui_update_status(false, "Connecting...", init_batt_pct, init_batt_mv, Axp2101_IsCharging());
+    bool init_charging = Axp2101_IsCharging();
+    bool init_vbus = Axp2101_IsVbusIn();
+    bool is_plugged_usb = init_vbus || init_charging || (init_batt_pct < 0);
+    clock_ui_update_status(false, is_plugged_usb ? "Connecting..." : "Batt Mode", init_batt_pct, init_batt_mv, init_charging, init_vbus);
     Serial.println("[UI] Clock UI ready!");
 
-    // 6. Wi-Fi Configuration
-    WiFi.setAutoReconnect(true);
-    WiFi.setSleep(true); // Allow 802.11 modem sleep between beacon intervals
-    esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
-
-    if (strlen(ClockConfigManager::settings.wifi_ssid) > 0) {
-        WiFi.mode(WIFI_STA);
-        Serial.printf("[Wi-Fi] Connecting in STA mode to '%s' (SoftAP off for battery saving)...\n", ClockConfigManager::settings.wifi_ssid);
-        WiFi.begin(ClockConfigManager::settings.wifi_ssid, ClockConfigManager::settings.wifi_pass);
+    // 6. Wi-Fi Configuration (Always-On Portal only when USB-Plugged)
+    if (is_plugged_usb) {
+        wifi_power_on();
     } else {
-        WiFi.mode(WIFI_AP_STA);
-        WiFi.softAP("ESP32-Sunrise-Clock", "12345678");
-        Serial.print("[Wi-Fi] SoftAP Started. Connect to 'ESP32-Sunrise-Clock' at IP: ");
-        Serial.println(WiFi.softAPIP());
+        Serial.println("[Power] Booted on Battery -> Wi-Fi Radio OFF (0mA idle current)");
+        WiFi.mode(WIFI_OFF);
+        esp_wifi_stop();
+        wifi_is_powered = false;
     }
-
-    // 7. Start Web Configuration Portal
-    ClockWebServer::init();
 
     Serial.println("[System] Smart Sunrise Alarm Clock Ready!");
 }
@@ -276,41 +311,56 @@ void loop() {
     // 2. Physical Button Handling (KEY = GPIO 10 [+], BOOT = GPIO 9 [-])
     check_physical_buttons();
 
-    // 3. Auto-dimming check (dims to 20% after 7 seconds of inactivity)
+    // 3. Auto-dimming check (dims after inactivity timeout)
     clock_ui_check_inactivity();
 
     static unsigned long last_update_ms = 0;
     static unsigned long last_status_ms = 0;
     unsigned long now_ms = millis();
 
-    // Handle incoming HTTP requests on Web Dashboard
-    ClockWebServer::update();
+    // Handle incoming HTTP requests on Web Dashboard (Only when USB plugged & Wi-Fi active)
+    if (wifi_is_powered) {
+        ClockWebServer::update();
 
-    if (ClockWebServer::checkTestRequested()) {
-        handleTestSunrise();
-    }
-    if (ClockWebServer::checkTestSoundRequested()) {
-        alarm_audio_play_test();
-    }
-    if (ClockWebServer::checkSettingsUpdated()) {
-        handleSettingsSaved();
+        if (ClockWebServer::checkTestRequested()) {
+            handleTestSunrise();
+        }
+        if (ClockWebServer::checkTestSoundRequested()) {
+            alarm_audio_play_test();
+        }
+        if (ClockWebServer::checkSettingsUpdated()) {
+            handleSettingsSaved();
+        }
     }
 
     // Check battery & connection status every 2 seconds
     if (now_ms - last_status_ms >= 2000) {
         last_status_ms = now_ms;
 
+        int batt_mv = Axp2101_GetBattVoltage();
+        int batt_percent = Axp2101_GetBatteryPercent();
+        bool charging = Axp2101_IsCharging();
+        bool vbus_in = Axp2101_IsVbusIn();
+        bool usb_plugged = vbus_in || charging || (batt_percent < 0);
+
+        // Power-Aware Dynamic Wi-Fi Management
+        if (usb_plugged && !wifi_is_powered) {
+            wifi_power_on();
+        } else if (!usb_plugged && wifi_is_powered) {
+            wifi_power_off();
+        }
+
         static bool last_wifi_state = false;
-        bool wifi_conn = (WiFi.status() == WL_CONNECTED);
+        bool wifi_conn = wifi_is_powered && (WiFi.status() == WL_CONNECTED);
         if (wifi_conn && !last_wifi_state) {
             Serial.printf("[Wi-Fi] Connected to %s! IP: %s\n", 
                           ClockConfigManager::settings.wifi_ssid, 
                           WiFi.localIP().toString().c_str());
             last_wifi_state = true;
 
-            WiFi.setSleep(true);
-            esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
-            Serial.println("[Power] Wi-Fi Modem Sleep active (Battery Savings)");
+            WiFi.setSleep(false);
+            esp_wifi_set_ps(WIFI_PS_NONE);
+            Serial.println("[Power] USB Connected -> Full-Speed Wi-Fi & Web Portal active");
 
             // Auto-detect location & timezone via IP if enabled
             if (ClockConfigManager::settings.auto_location) {
@@ -322,20 +372,34 @@ void loop() {
             last_wifi_state = false;
         }
 
-        String wifi_str = wifi_conn ? WiFi.localIP().toString() : "AP: Clock";
-        int batt_mv = Axp2101_GetBattVoltage();
-        int batt_percent = Axp2101_GetBatteryPercent();
-        bool charging = Axp2101_IsCharging();
+        String wifi_str;
+        if (wifi_conn) {
+            wifi_str = WiFi.localIP().toString();
+        } else if (wifi_is_powered) {
+            wifi_str = "AP: Clock";
+        } else {
+            wifi_str = "Batt Mode";
+        }
 
-        clock_ui_update_status(wifi_conn, wifi_str.c_str(), batt_percent, batt_mv, charging);
+        clock_ui_update_status(wifi_conn, wifi_str.c_str(), batt_percent, batt_mv, charging, vbus_in);
     }
 
     // Weather periodic refresh (every 30 minutes) or on tap-to-refresh
-    static unsigned long last_weather_fetch_ms = 0;
+    static unsigned long last_weather_attempt_ms = 0;
     bool tap_weather_refresh = clock_ui_check_weather_refresh_requested();
-    if (WiFi.status() == WL_CONNECTED && (tap_weather_refresh || (last_weather_fetch_ms > 0 && now_ms - last_weather_fetch_ms >= 1800000))) {
-        last_weather_fetch_ms = now_ms;
-        ClockWeatherManager::fetch_weather(ClockConfigManager::settings.latitude, ClockConfigManager::settings.longitude);
+    if (wifi_is_powered && WiFi.status() == WL_CONNECTED) {
+        bool should_fetch = tap_weather_refresh;
+        if (!should_fetch) {
+            if (!ClockWeatherManager::data.valid && (now_ms - last_weather_attempt_ms >= 30000 || last_weather_attempt_ms == 0)) {
+                should_fetch = true;
+            } else if (ClockWeatherManager::data.valid && (now_ms - ClockWeatherManager::data.last_fetch_ms >= 1800000)) {
+                should_fetch = true;
+            }
+        }
+        if (should_fetch) {
+            last_weather_attempt_ms = now_ms;
+            ClockWeatherManager::fetch_weather(ClockConfigManager::settings.latitude, ClockConfigManager::settings.longitude);
+        }
     }
 
     // Main Clock / Sunrise / Alarm State Machine (Runs every 200ms)
@@ -371,6 +435,22 @@ void loop() {
                 ClockConfigManager::settings.is_24h_format
             );
 
+            // Night mode check: transition between day & night colors (based on real astronomical sunrise/sunset or evening hours)
+            static bool last_is_night = false;
+            static bool night_initialized = false;
+            bool is_night = (ClockWeatherManager::data.valid ? !ClockWeatherManager::data.is_day : (timeinfo.tm_hour >= 18 || timeinfo.tm_hour < 6));
+            if (!ClockWeatherManager::data.valid) {
+                ClockWeatherManager::data.is_day = !is_night;
+                if (is_night) {
+                    strcpy(ClockWeatherManager::data.condition_text, "Clear Night");
+                }
+            }
+            if (!night_initialized || is_night != last_is_night) {
+                night_initialized = true;
+                last_is_night = is_night;
+                clock_ui_set_night_mode(is_night);
+            }
+
             // Calculate Astronomical Moon Phase & Update Weather / Moon Pill
             ClockWeatherManager::calculate_moon(timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday);
             clock_ui_update_weather(
@@ -387,8 +467,8 @@ void loop() {
                 last_serial_ms = now_ms;
                 int batt_mv = Axp2101_GetBattVoltage();
                 int batt_percent = Axp2101_GetBatteryPercent();
-                bool wifi_conn = (WiFi.status() == WL_CONNECTED);
-                String wifi_str = wifi_conn ? WiFi.localIP().toString() : "AP: Clock";
+                bool wifi_conn = wifi_is_powered && (WiFi.status() == WL_CONNECTED);
+                String wifi_str = wifi_conn ? WiFi.localIP().toString() : (wifi_is_powered ? "AP: Clock" : "Batt Mode (Wi-Fi OFF)");
                 Serial.printf("[Clock] Local Time: %02d:%02d:%02d | %s | WiFi: %s | Batt: %d%% (%dmV) | Brightness: %d%% (Dimmed: %s) | Location: %s (%s)\n",
                               timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec,
                               date_buf,
@@ -399,18 +479,10 @@ void loop() {
                               ClockConfigManager::settings.timezone_name);
             }
 
-            // Night mode check: transition between day & night colors (never overrides backlight)
-            static bool last_is_night = false;
-            static bool night_initialized = false;
-            bool is_night = (timeinfo.tm_hour >= 22 || timeinfo.tm_hour < 7);
-            if (!night_initialized || is_night != last_is_night) {
-                night_initialized = true;
-                last_is_night = is_night;
-                clock_ui_set_night_mode(is_night);
-            }
-
-            // Reset fired flag at midnight
-            if (timeinfo.tm_hour == 0 && timeinfo.tm_min == 0) {
+            // Reset fired flag on calendar day rollover (fires once per day)
+            static int last_alarm_day = -1;
+            if (last_alarm_day != timeinfo.tm_mday) {
+                last_alarm_day = timeinfo.tm_mday;
                 alarm_fired_today = false;
             }
 
@@ -473,6 +545,7 @@ void loop() {
                 if (diff_sec <= 0 || diff_sec > 24 * 3600 - 60) {
                     progress = 1.0f;
                     clock_state = STATE_ALARM_FIRING;
+                    alarm_audio_start();
                     clock_ui_trigger_alarm();
                 } else {
                     progress = 1.0f - ((float)diff_sec / (float)sunrise_total_sec);

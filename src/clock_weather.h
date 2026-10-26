@@ -212,6 +212,9 @@ public:
         bool is_day = true;
         if (day_idx != -1) {
             day_idx += 9;
+            while (day_idx < (int)current_data.length() && (current_data.charAt(day_idx) == ' ' || current_data.charAt(day_idx) == '\t')) {
+                day_idx++;
+            }
             is_day = (current_data.charAt(day_idx) == '1');
         }
 

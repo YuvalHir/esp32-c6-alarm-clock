@@ -243,20 +243,30 @@ private:
 
 public:
     static void init() {
-        server.on("/", handleRoot);
-        server.on("/save_alarm", HTTP_POST, handleSaveAlarm);
-        server.on("/save_location", HTTP_POST, handleSaveLocation);
-        server.on("/detect_location", HTTP_POST, handleDetectLocation);
-        server.on("/refresh_weather", HTTP_POST, handleRefreshWeather);
-        server.on("/save_brightness", HTTP_POST, handleSaveBrightness);
-        server.on("/save_wifi", HTTP_POST, handleSaveWifi);
-        server.on("/test_sunrise", HTTP_POST, handleTestSunrise);
-        server.on("/test_sound", HTTP_POST, handleTestSound);
+        static bool routes_registered = false;
+        if (!routes_registered) {
+            routes_registered = true;
+            server.on("/", handleRoot);
+            server.on("/save_alarm", HTTP_POST, handleSaveAlarm);
+            server.on("/save_location", HTTP_POST, handleSaveLocation);
+            server.on("/detect_location", HTTP_POST, handleDetectLocation);
+            server.on("/refresh_weather", HTTP_POST, handleRefreshWeather);
+            server.on("/save_brightness", HTTP_POST, handleSaveBrightness);
+            server.on("/save_wifi", HTTP_POST, handleSaveWifi);
+            server.on("/test_sunrise", HTTP_POST, handleTestSunrise);
+            server.on("/test_sound", HTTP_POST, handleTestSound);
+        }
         server.begin();
     }
 
+    static void stop() {
+        server.stop();
+    }
+
     static void update() {
-        server.handleClient();
+        if (WiFi.status() == WL_CONNECTED || (WiFi.getMode() & WIFI_AP)) {
+            server.handleClient();
+        }
     }
 
     static bool checkTestRequested() {

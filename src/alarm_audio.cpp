@@ -47,6 +47,7 @@ static void es8311_power_up() {
     if (is_audio_powered) return;
     if (tx_handle) {
         i2s_channel_enable(tx_handle);
+        vTaskDelay(pdMS_TO_TICKS(15));
     }
     es8311_write(0x0E, 0x00); // Power up analog circuits
     es8311_write(0x12, 0x00); // Power up DAC
@@ -282,7 +283,6 @@ void alarm_audio_start() {
 void alarm_audio_stop() {
     is_playing_alarm = false;
     is_playing_test = false;
-    es8311_power_down();
     Serial.println("[Audio] Alarm Chime STOPPED");
 }
 
